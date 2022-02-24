@@ -71,8 +71,8 @@ namespace Tetris
                     };
                 
 
-                    Canvas.SetTop(imageControl, (r - 2) * cellSize); //this is to push the top hidden rows up to not show up on the canvas
-                    Canvas.SetLeft(imageControl, c * cellSize);
+                    Canvas.SetTop(imageControl, (r - 2) * cellSize + 10); //this is to push the top hidden rows up to not show up on the canvas
+                    Canvas.SetLeft(imageControl, c * cellSize); // + 10 was added to show which block has ended the game on game over
                     GameCanvas.Children.Add(imageControl);
                     imageControls[r, c] = imageControl;
                 }
@@ -87,6 +87,7 @@ namespace Tetris
                 for (int c = 0; c < grid.Columns; c++)
                 {
                     int id = grid[r, c]; // this sets the starting source for id
+                    imageControls[r, c].Opacity = 1;
                     imageControls[r, c].Source = tileImages[id]; // sets source of image at position using id
                 }
             }
@@ -96,25 +97,63 @@ namespace Tetris
         {
             foreach (Position p in block.TilePositions())
             {
+                imageControls[p.Row, p.Column].Opacity = 1;
                 imageControls[p.Row, p.Column].Source = tileImages[block.Id]; 
+            }
+        }
+
+        private void DrawNextBlock(BlockQueue blockQueue) // this is a next block preview
+        {
+            Block next = blockQueue.NextBlock;
+            NextImage.Source = blockImages[next.Id];
+        }
+
+        private void DrawHeldBlock(Block heldBlock)
+        {
+            if (heldBlock == null)
+            {
+                HoldImage.Source = blockImages[0];
+            }
+            else
+            {
+                HoldImage.Source = blockImages[heldBlock.Id];
+            }
+        }
+
+        private void DrawGhostBlock(Block block) // this shows a preview ghost block on where it will land
+        {
+            int dropDistance = gameState.BlockDropDistance();
+
+            foreach (Position p in block.TilePositions())
+            {
+                imageControls[p.Row + dropDistance, p.Column].Opacity = 0.25;
+                imageControls[p.Row + dropDistance, p.Column].Source = tileImages[block.Id];
             }
         }
 
         private void Draw(GameState gameState) // this calls draw method that draws both grid and current block
         {
             DrawGrid(gameState.GameGrid);
+            DrawGhostBlock(gameState.CurrentBlock);
             DrawBlock(gameState.CurrentBlock);
+            DrawNextBlock(gameState.BlockQueue);
+            DrawHeldBlock(gameState.HeldBlock);
+            ScoreText.Text = $"Score: {gameState.Score}";
         }
 
         private async Task GameLoop() // async is needed, as the game has to wait without blocking UI
         {
-            Draw(GameState);
+            Draw(gameState);
 
-            while (!gameState.GameOver)
+            while (!gameState.GameOver) // this while loop waits 500 millisecs, moves the block down and then redraws
             {
                 await Task.Delay(500);
                 gameState.MoveBlockDown();
+                Draw(gameState);
             }
+
+            GameOverMenu.Visibility = Visibility.Visible; // basically when game is over, it shows a menu
+            FinalScoreText.Text = $"Score: {gameState.Score}"; // final score shows on game over
         }
 
 
@@ -144,16 +183,29 @@ namespace Tetris
                 case Key.Z:
                     gameState.RotateBlockCCW();
                     break;
+                case Key.C:
+                    gameState.HoldBlock();
+                    break;
+                case Key.Space:
+                    gameState.DropBlock();
+                    break;
                 default:
                     return; // this ensure that the game redraws if the player does something when pressing a key
             }
 
             Draw(gameState);
         }
-        private void GameCanvas_Loaded(object sender, RoutedEventArgs e)
+        private async void GameCanvas_Loaded(object sender, RoutedEventArgs e) // this awaits for the canvas to be loaded
         {
-            Draw(gameState);
+           await GameLoop();
         }
 
+
+        private async void  PlayAgain_Click(object sender, RoutedEventArgs e) // makes the Play Again button functionable
+        {
+            gameState = new GameState();
+            GameOverMenu.Visibility = Visibility.Hidden;
+            await GameLoop();
+        }
     }
 }
