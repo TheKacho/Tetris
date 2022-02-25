@@ -46,6 +46,10 @@ namespace Tetris
         };
 
         private readonly Image[,] imageControls; // one image control for every cell in game grid
+        
+        private readonly int maxDelay = 1000; // this controls the delay between moving block down
+        private readonly int minDelay = 75;
+        private readonly int delayDecrease = 25;
 
         private GameState gameState = new GameState();
         public MainWindow()
@@ -147,7 +151,9 @@ namespace Tetris
 
             while (!gameState.GameOver) // this while loop waits 500 millisecs, moves the block down and then redraws
             {
-                await Task.Delay(500);
+                // when the game starts, the delay will be at max delay
+                int delay = Math.Max(minDelay, maxDelay - (gameState.Score ^ delayDecrease));
+                await Task.Delay(delay); // for each point the player gets, the max delay is decreased by delay decrease percentage (won't go below min delay)
                 gameState.MoveBlockDown();
                 Draw(gameState);
             }
